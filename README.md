@@ -1,5 +1,5 @@
 📟 hd44780-i2c-nostd
-🦅 Version 0.1.1
+🦅 Version 0.1.2
 A Robust, High-Performance HD44780 Driver for Rust (no_std). Optimized for Embassy and embedded systems like RP2040 (Pico), Pico 2, STM32, and ESP32.
 
 Created by Jorge Andre Castro.
@@ -21,7 +21,7 @@ Anti-Glitch Initialization: Implements the official HD44780 4-bit initialization
 Flexible Layouts: Supports 16x2, 20x4, and other standard character LCD geometries.
 
 📋 Changelog & Updates
-🦅 Version 0.1.1 
+🦅 Version 0.1.2
 Feature: Full asynchronous support via I2c and DelayNs traits.
 
 Feature: Integrated Cursor Management and Backlight control.
@@ -33,7 +33,7 @@ Installation
 
 Ini, TOML
 [dependencies]
-hd44780-i2c-nostd = "0.1.1"
+hd44780-i2c-nostd = "0.1.2"
 
 
 💡 Quick Start
