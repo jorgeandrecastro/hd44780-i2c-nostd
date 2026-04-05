@@ -7,7 +7,7 @@ Created by Jorge Andre Castro.
 🛡️ The Mission
 hd44780-i2c-nostd provides a reliable way to drive classic LCD displays via the PCF8574 I2C expander. This crate is licensed under GPL-2.0-or-later to ensure that fundamental hardware drivers remain a common good and are never locked away in proprietary blobs.
 
-![alt text](image.png)
+![Texte alternatif](assets/photo_pico.jpg)
 
 🚀 Key Features
 True Async Native: Built from the ground up for embedded-hal-async. No blocking loops, no CPU wastage.
