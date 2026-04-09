@@ -1,6 +1,26 @@
 📟 hd44780-i2c-nostd
-🦅 Version 0.1.2
+🦅 Version v0.2.0
 A Robust, High-Performance HD44780 Driver for Rust (no_std). Optimized for Embassy and embedded systems like RP2040 (Pico), Pico 2, STM32, and ESP32.
+
+
+🛡️ Hardware Resilience & Self-Healing (v0.2.0)
+The most significant update in version 0.2.0 is the introduction of a resilient communication layer designed for long-running embedded systems.
+
+The "Garbage Data" Problem
+Standard HD44780 drivers often suffer from "LCD corruption" or "hieroglyphs." This happens when the display loses power or is physically disconnected. Upon reconnection, the LCD resets to its default 8-bit mode, while the microcontroller continues sending data in 4-bit mode. This mismatch results in unreadable characters and requires a manual system reset.
+
+The Solution: safe_send logic
+This crate solves this by wrapping I2C transactions in a Self-Healing loop:
+
+Detection: Every command monitors the I2C bus for NACK errors or communication failures.
+
+Auto-Recovery: If a failure is detected, the driver assumes a hot-plug event or power glitch occurred and automatically re-triggers the 4-bit initialization sequence.
+
+Seamless Resumption: The original data is then re-transmitted, ensuring the user sees the correct output without any manual intervention or re-flashing.
+
+> [!NOTE]
+API Change: To support this "Always-On" reliability, public methods such as write_str, set_cursor, and clear now require a delay argument. This ensures the driver can respect hardware timings during an automatic recovery event.
+
 
 Created by Jorge Andre Castro.
 
@@ -50,9 +70,10 @@ let mut lcd = LcdI2c::new(i2c, 0x27);
 // 3. Initialisation with a delay provider
 lcd.init(&mut Delay).await.unwrap();
 
-// 4. Write your data
-lcd.set_cursor(0, 0).await.ok();
-lcd.write_str("Project of my life").await.ok();
+
+// 4. Write your data (don't forget the delay argument!)
+lcd.set_cursor(0, 0, &mut Delay).await.ok();
+lcd.write_str("Project of my life", &mut Delay).await.ok();
 
 // 5. Toggle Backlight
 lcd.set_backlight(true);
@@ -61,12 +82,12 @@ Rust
 // In your main loop, display PID data or sensor values
 loop {
     let temp = sensor.read_temp().await;
-    lcd.set_cursor(1, 0).await.ok();
+    lcd.set_cursor(1, 0, &mut Delay).await.ok();
     
     // Pro-tip: use core::fmt with a small buffer for dynamic strings
     let mut buf = [0u8; 16];
     if let Ok(s) = format_no_std(&mut buf, format_args!("Temp: {:.2}C", temp)) {
-        lcd.write_str(s).await.ok();
+        lcd.write_str(s, &mut Delay).await.ok();
     }
     
     Timer::after_millis(500).await;

@@ -59,47 +59,55 @@ impl<I2C: I2c> LcdI2c<I2C> {
         Ok(())
     }
 
+    /// Méthode de secours : si l'envoi échoue, on ré-initialise et on retente.
+    async fn safe_send(&mut self, data: u8, mode: u8, delay: &mut impl DelayNs) -> Result<(), I2C::Error> {
+        if self.send_byte(data, mode).await.is_err() {
+            self.init(delay).await?; // Rebranchement détecté -> Ré-init 4-bit
+            self.send_byte(data, mode).await?; // Retente l'envoi
+        }
+        Ok(())
+    }
+
     /// Initializes the display using the standard 4-bit sequence.
-    pub async fn init(&mut self, delay: &mut impl DelayNs) -> Result<(), I2C::Error> {
-        // Wait for power stabilization
+  pub async fn init(&mut self, delay: &mut impl DelayNs) -> Result<(), I2C::Error> {
         delay.delay_ms(50).await;
 
-        // Force 4-bit mode sequence
         for _ in 0..3 {
             self.write_nibble(0x30, 0).await?;
             delay.delay_ms(5).await;
         }
         self.write_nibble(0x20, 0).await?; 
 
-        // Configure display: 2 lines, 5x8 dots
         self.send_byte(CMD_FUNCTION_SET | 0x08, 0).await?;
-        // Display ON, Cursor OFF, Blinking OFF
         self.send_byte(CMD_DISPLAY_CONTROL | 0x04, 0).await?;
-        // Entry mode: Auto-increment cursor
         self.send_byte(CMD_ENTRY_MODE | 0x02, 0).await?;
         
-        self.clear(delay).await?;
-        Ok(())
-    }
-
-    /// Clears the display. Requires a mandatory 2ms delay.
-    pub async fn clear(&mut self, delay: &mut impl DelayNs) -> Result<(), I2C::Error> {
+        // Utilisation directe ici pour la sécurité
         self.send_byte(CMD_CLEAR, 0).await?;
         delay.delay_ms(2).await;
         Ok(())
     }
 
+    /// Clears the display. Requires a mandatory 2ms delay.
+    /// Clears the display. Requires a mandatory 2ms delay.
+    pub async fn clear(&mut self, delay: &mut impl DelayNs) -> Result<(), I2C::Error> {
+        self.safe_send(CMD_CLEAR, 0, delay).await?; // Changé en safe_send
+        delay.delay_ms(2).await;
+        Ok(())
+    }
+
+    
     /// Sets the cursor to a specific row and column.
-    pub async fn set_cursor(&mut self, row: u8, col: u8) -> Result<(), I2C::Error> {
+    pub async fn set_cursor(&mut self, row: u8, col: u8, delay: &mut impl DelayNs) -> Result<(), I2C::Error> {
         let offsets = [0x00, 0x40, 0x14, 0x54];
         let addr = 0x80 + offsets[row as usize] + col;
-        self.send_byte(addr, 0).await
+        self.safe_send(addr, 0, delay).await // Utilise safe_send ici
     }
 
     /// Writes a string to the current cursor position.
-    pub async fn write_str(&mut self, s: &str) -> Result<(), I2C::Error> {
+    pub async fn write_str(&mut self, s: &str, delay: &mut impl DelayNs) -> Result<(), I2C::Error> {
         for b in s.as_bytes() {
-            self.send_byte(*b, RS).await?;
+            self.safe_send(*b, RS, delay).await?; // Utilise safe_send ici
         }
         Ok(())
     }
@@ -110,7 +118,7 @@ impl<I2C: I2c> LcdI2c<I2C> {
     }
 
     /// Returns the cursor to the home position (0,0) without clearing the display.
-    pub async fn return_home(&mut self) -> Result<(), I2C::Error> {
-      self.send_byte(CMD_RETURN_HOME, 0).await
+    pub async fn return_home(&mut self, delay: &mut impl DelayNs) -> Result<(), I2C::Error> {
+        self.safe_send(CMD_RETURN_HOME, 0, delay).await
     }
 }
