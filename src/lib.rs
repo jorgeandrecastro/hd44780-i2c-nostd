@@ -68,25 +68,32 @@ impl<I2C: I2c> LcdI2c<I2C> {
         Ok(())
     }
 
-    /// Initializes the display using the standard 4-bit sequence.
-     pub async fn init(&mut self, delay: &mut impl DelayNs) -> Result<(), I2C::Error> {
-        // Stabilisation électrique
-        delay.delay_ms(100).await;
+    pub async fn init(&mut self, delay: &mut impl DelayNs) -> Result<(), I2C::Error> {
+        // 1. On attend un peu moins mais on nettoie le bus
+        delay.delay_ms(50).await;
 
-        // Force la réinitialisation logicielle du contrôleur (Software Reset)
-        for _ in 0..3 {
-            self.write_nibble(0x30, 0).await?;
-            delay.delay_ms(10).await; 
+        // 2. LE SECRET : Envoyer des commandes "vides" pour vider le buffer du LCD
+        // Si le LCD attendait la 2ème moitié d'une commande, ceci la termine.
+        for _ in 0..5 {
+            let _ = self.i2c.write(self.addr, &[self.backlight_state]).await;
+            delay.delay_ms(2).await;
         }
 
-        // Passage définitif en mode 4-bits
-        self.write_nibble(0x20, 0).await?; 
-        delay.delay_ms(10).await;
+        // 3. SEQUENCE DE FORCE (Official Software Reset)
+        // On envoie 0x30 en mode "nibble direct" (8-bit style) pour forcer le reset
+        for _ in 0..4 {
+            self.write_nibble(0x30, 0).await?;
+            delay.delay_ms(15).await; // Délai plus long pour laisser le contrôleur réagir
+        }
 
-        // Configuration du hardware
-        self.send_byte(CMD_FUNCTION_SET | 0x08, 0).await?;     // 2 lignes, 5x8 dots
-        self.send_byte(CMD_DISPLAY_CONTROL | 0x0C, 0).await?;  // Display ON, No cursor
-        self.send_byte(CMD_ENTRY_MODE | 0x02, 0).await?;       // Auto-increment
+        // 4. Passage en 4-bits (On insiste !)
+        self.write_nibble(0x20, 0).await?; 
+        delay.delay_ms(15).await;
+
+        // 5. Configuration standard
+        self.send_byte(CMD_FUNCTION_SET | 0x08, 0).await?;
+        self.send_byte(CMD_DISPLAY_CONTROL | 0x0C, 0).await?; 
+        self.send_byte(CMD_ENTRY_MODE | 0x02, 0).await?;
         
         self.send_byte(CMD_CLEAR, 0).await?;
         delay.delay_ms(5).await;

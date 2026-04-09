@@ -19,7 +19,7 @@ dependencies = [
 
 [[package]]
 name = "hd44780-i2c-nostd"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "embedded-hal",
  "embedded-hal-async",

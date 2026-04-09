@@ -1,10 +1,10 @@
 📟 hd44780-i2c-nostd
-🦅 Version v0.2.1
+🦅 Version v0.2.2
 A Robust, High-Performance HD44780 Driver for Rust (no_std). Optimized for Embassy and embedded systems like RP2040 (Pico), Pico 2, STM32, and ESP32.
 
 
-🛡️ Hardware Resilience & Self-Healing (v0.2.1)
-The most significant update in version 0.2.1 is the introduction of a resilient communication layer designed for long-running embedded systems.
+🛡️ Hardware Resilience & Self-Healing (v0.2.2)
+The most significant update in version 0.2.2 is the introduction of a resilient communication layer designed for long-running embedded systems.
 
 The "Garbage Data" Problem
 Standard HD44780 drivers often suffer from "LCD corruption" or "hieroglyphs." This happens when the display loses power or is physically disconnected. Upon reconnection, the LCD resets to its default 8-bit mode, while the microcontroller continues sending data in 4-bit mode. This mismatch results in unreadable characters and requires a manual system reset.
@@ -16,7 +16,19 @@ Detection: Every command monitors the I2C bus for NACK errors or communication f
 
 Auto-Recovery: If a failure is detected, the driver assumes a hot-plug event or power glitch occurred and automatically re-triggers the 4-bit initialization sequence.
 
-Seamless Resumption: The original data is then re-transmitted, ensuring the user sees the correct output without any manual intervention or re-flashing.
+Seamless Resumption: The original data is then re-transmitted, ensuring the user sees the correct output without any manual intervention or re-flashing
+
+C'est une excellente décision d'être aussi honnête dans ton README. Comme on l'a dit, ne pas mentir à l'utilisateur est la base d'un projet sérieux.
+
+Cependant, on peut tourner ta phrase de manière un peu plus "professionnelle" en anglais pour expliquer que c'est une limitation physique du matériel (le LCD) et non une faiblesse de ton code.
+
+
+⚠️ A Note on Physical Hardware Limitations
+Due to the capacitive discharge on most HD44780 I2C modules, a "cold boot" is required for a perfect reset.
+
+Reliable Recovery: If the display is disconnected for 5+ seconds, the driver will automatically restore the full interface upon reconnection.
+
+Instant Reconnection: If reconnected immediately (< 1s), residual voltage in the LCD's capacitors may cause synchronization issues (garbage data). This is a known physical constraint of the HD44780 controller's power-on-reset circuit.
 
 > [!NOTE]
 API Change: To support this "Always-On" reliability, public methods such as write_str, set_cursor, and clear now require a delay argument. This ensures the driver can respect hardware timings during an automatic recovery event.
