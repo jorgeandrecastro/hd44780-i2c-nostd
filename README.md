@@ -1,10 +1,10 @@
 📟 hd44780-i2c-nostd
-🦅 Version v0.2.0
+🦅 Version v0.2.1
 A Robust, High-Performance HD44780 Driver for Rust (no_std). Optimized for Embassy and embedded systems like RP2040 (Pico), Pico 2, STM32, and ESP32.
 
 
-🛡️ Hardware Resilience & Self-Healing (v0.2.0)
-The most significant update in version 0.2.0 is the introduction of a resilient communication layer designed for long-running embedded systems.
+🛡️ Hardware Resilience & Self-Healing (v0.2.1)
+The most significant update in version 0.2.1 is the introduction of a resilient communication layer designed for long-running embedded systems.
 
 The "Garbage Data" Problem
 Standard HD44780 drivers often suffer from "LCD corruption" or "hieroglyphs." This happens when the display loses power or is physically disconnected. Upon reconnection, the LCD resets to its default 8-bit mode, while the microcontroller continues sending data in 4-bit mode. This mismatch results in unreadable characters and requires a manual system reset.

@@ -69,26 +69,31 @@ impl<I2C: I2c> LcdI2c<I2C> {
     }
 
     /// Initializes the display using the standard 4-bit sequence.
-  pub async fn init(&mut self, delay: &mut impl DelayNs) -> Result<(), I2C::Error> {
-        delay.delay_ms(50).await;
+     pub async fn init(&mut self, delay: &mut impl DelayNs) -> Result<(), I2C::Error> {
+        // Stabilisation électrique
+        delay.delay_ms(100).await;
 
+        // Force la réinitialisation logicielle du contrôleur (Software Reset)
         for _ in 0..3 {
             self.write_nibble(0x30, 0).await?;
-            delay.delay_ms(5).await;
+            delay.delay_ms(10).await; 
         }
-        self.write_nibble(0x20, 0).await?; 
 
-        self.send_byte(CMD_FUNCTION_SET | 0x08, 0).await?;
-        self.send_byte(CMD_DISPLAY_CONTROL | 0x04, 0).await?;
-        self.send_byte(CMD_ENTRY_MODE | 0x02, 0).await?;
+        // Passage définitif en mode 4-bits
+        self.write_nibble(0x20, 0).await?; 
+        delay.delay_ms(10).await;
+
+        // Configuration du hardware
+        self.send_byte(CMD_FUNCTION_SET | 0x08, 0).await?;     // 2 lignes, 5x8 dots
+        self.send_byte(CMD_DISPLAY_CONTROL | 0x0C, 0).await?;  // Display ON, No cursor
+        self.send_byte(CMD_ENTRY_MODE | 0x02, 0).await?;       // Auto-increment
         
-        // Utilisation directe ici pour la sécurité
         self.send_byte(CMD_CLEAR, 0).await?;
-        delay.delay_ms(2).await;
+        delay.delay_ms(5).await;
         Ok(())
     }
 
-    /// Clears the display. Requires a mandatory 2ms delay.
+   
     /// Clears the display. Requires a mandatory 2ms delay.
     pub async fn clear(&mut self, delay: &mut impl DelayNs) -> Result<(), I2C::Error> {
         self.safe_send(CMD_CLEAR, 0, delay).await?; // Changé en safe_send
