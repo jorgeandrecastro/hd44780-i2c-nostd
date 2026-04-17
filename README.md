@@ -1,9 +1,12 @@
  # 📟 hd44780-i2c-nostd
-🦅 Version v0.2.4
+🦅 Version v0.3.0 testé  sur la pico 2 
 
 Un pilote HD44780 robuste et haute performance pour Rust (no_std). Optimisé pour Embassy et les systèmes embarqués comme RP2040 (Pico), Pico 2, STM32 et ESP32.
 
-🚀 Mise à jour v0.2.4  Exemple
+# Update la version 0.3.0 introduit le #![forbid(unsafe_code)] 
+Choix pour la safety.
+
+# 🚀 Mise à jour v0.2.4  Exemple
 Cette version est une étape majeure pour la fiabilité du driver dans l'écosystème Rust embarqué.
 
 📦 Ce qui change :
@@ -12,7 +15,7 @@ Exemple "Plug & Play"  Dans la Section exemples : Ajout d'un exemple complet pr�
 Linker Pico 2 (RP2350) : Inclusion d'une configuration de Linker optimisée pour la Raspberry Pi Pico 2. C'est une ressource précieuse pour ceux qui migrent vers cette nouvelle puce.
 
 
-🛠️ Tests et Compatibilité :
+# 🛠️ Tests et Compatibilité :
 Validé sur Pico 2 : Le driver hd44780-i2c-nostd a été testé avec succès sur le matériel RP2350.
 
 Appel aux testeurs (Pico 1/RP2040) : Bien que le driver soit conçu pour fonctionner sur tout l'écosystème Embassy, la théorie ne remplace jamais la pratique. Si vous utilisez une Pico 1, vos retours sont les bienvenus !
@@ -67,7 +70,7 @@ hd44780-i2c-nostd fournit un moyen fiable de piloter des écrans LCD classiques 
 
 Cette crate est sous licence GPL-2.0-or-later afin de garantir que les drivers matériels fondamentaux restent un bien commun, et ne soient jamais enfermés dans des solutions propriétaires.
 
-🚀 Fonctionnalités principales
+# 🚀 Fonctionnalités principales
 Vrai asynchrone natif : construit dès le départ pour embedded-hal-async (aucune boucle bloquante, aucun gaspillage CPU)
 Efficacité zero-copy : transactions I2C optimisées avec regroupement des états High/Low pour saturer efficacement le bus
 no_std & bare-metal : parfait pour Embassy, RTIC ou des kernels personnalisés
@@ -78,8 +81,10 @@ Layouts flexibles : compatible avec écrans 16x2, 20x4 et autres formats standar
 Support asynchrone complet via I2c et DelayNs
 Gestion du curseur et du rétroéclairage
 Optimisation : écriture en une seule transaction pour réduire la charge I2C
-🛠️ Utilisation
+
+# 🛠️ Utilisation
 Installation
+````
 [dependencies]
 hd44780-i2c-nostd = "0.1.2"
 💡 Démarrage rapide
@@ -114,9 +119,9 @@ loop {
     Timer::after_millis(500).await;
 }
 
-
+````
 # Exemple
-
+````
 [package]
 name = "andrew-pico2"
 version = "0.1.0"
@@ -138,9 +143,9 @@ embassy-embedded-hal = { version = "0.3.0" }
 embedded-hal = "1.0"
 embedded-hal-async = "1.0"
 
- TMes crates 
+Mes crates 
 rp2350-linker = "0.2.1"
-hd44780-i2c-nostd = "0.2.2"
+hd44780-i2c-nostd = "0.3.0"
 panic-halt = "0.2.0"
 
 [profile.release]
@@ -149,10 +154,10 @@ opt-level = 'z'
 panic = "abort"
 strip = true
 
-
+````
 # Le config.toml indispensable :
 
-
+````
 [build]
 target = "thumbv8m.main-none-eabihf"
 
@@ -167,7 +172,7 @@ rustflags = [
    
 ]
 
-
+````
 si jamais le link vous manque :cargo install flip-link
 
 La flash.sh avec picotool:
@@ -190,7 +195,7 @@ sudo picotool load Votrenomdeprojet.uf2 -x
 
 
 # Et l'integration :
-
+````rust
 #![no_std]
 #![no_main]
 
@@ -252,11 +257,150 @@ async fn main(_spawner: Spawner) {
         Timer::after(Duration::from_millis(900)).await;
     }
 }
+````
 
+**Exemple Gyro et sqrt  gestion du bus pour eviter des bugs de freeze**
 
+````rust 
+// Copyright (C) 2026 Jorge Andre Castro
+#![no_std]
+#![no_main]
+#![forbid(unsafe_code)]
 
+use cortex_m_rt as _;
+use embassy_executor::Spawner;
+use embassy_rp::gpio::{Level, Output, Flex, Pull};
+use embassy_rp::i2c::{Config as I2cConfig, I2c, Async};
+use embassy_time::{Delay, Duration, Timer, with_timeout};
+use hd44780_i2c_nostd::LcdI2c;
+use {panic_halt as _, embassy_rp as _};
+use heapless::String;
+use core::fmt::Write;
 
-👨‍💻 Créé par Jorge Andre Castro
+use embassy_embedded_hal::shared_bus::asynch::i2c::I2cDevice;
+use embassy_sync::blocking_mutex::raw::NoopRawMutex;
+use embassy_sync::mutex::Mutex;
+use static_cell::StaticCell;
+
+use embassy_gy_bmi160::Bmi160;
+use embassy_gy_bmi160::signals::{ACCEL_SIGNAL, GYRO_SIGNAL};
+use embedded_f32_sqrt::sqrt;
+
+use rp2350_linker as _;
+use embassy_rp::bind_interrupts;
+use embassy_rp::peripherals::I2C0; 
+
+bind_interrupts!(struct Irqs {
+    I2C0_IRQ => embassy_rp::i2c::InterruptHandler<I2C0>;
+});
+
+static I2C_BUS: StaticCell<Mutex<NoopRawMutex, I2c<'static, I2C0, Async>>> = StaticCell::new();
+
+#[embassy_executor::main]
+async fn main(spawner: Spawner) {
+    let mut p = embassy_rp::init(embassy_rp::config::Config::default());
+    
+    // PATCH ANTI-BUG PAR REBORROW 
+    {
+        // .reborrow() permet de créer un accès temporaire pour Flex
+        // sans consommer définitivement p.PIN_5 et p.PIN_4.
+        let mut scl = Flex::new(p.PIN_5.reborrow());
+        let mut sda = Flex::new(p.PIN_4.reborrow());
+        
+        scl.set_as_output();
+        sda.set_as_input();
+        sda.set_pull(Pull::Up);
+
+        for _ in 0..9 {
+            scl.set_low();
+            Timer::after_micros(10).await;
+            scl.set_high();
+            Timer::after_micros(10).await;
+            if sda.is_high() { break; }
+        }
+    } 
+    
+    Timer::after_millis(50).await; 
+
+    let mut i2c_config = I2cConfig::default();
+    i2c_config.frequency = 100_000;
+    
+    // Les pins sont toujours possédées par 'p', donc on peut les donner à l'I2C ici.
+    let i2c = I2c::new_async(p.I2C0, p.PIN_5, p.PIN_4, Irqs, i2c_config);
+    let i2c_bus = Mutex::<NoopRawMutex, _>::new(i2c);
+    let i2c_bus = I2C_BUS.init(i2c_bus);
+
+    let lcd_i2c = I2cDevice::new(i2c_bus);
+    let bmi_i2c = I2cDevice::new(i2c_bus);
+
+    let lcd = LcdI2c::new(lcd_i2c, 0x3F); 
+    let bmi = Bmi160::new(bmi_i2c, 0x68);
+
+    spawner.spawn(system_task(lcd, bmi)).unwrap();
+
+    let mut led = Output::new(p.PIN_25, Level::Low);
+    loop {
+        led.toggle();
+        Timer::after_millis(200).await; 
+    }
+}
+
+#[embassy_executor::task]
+async fn system_task(
+    mut lcd: LcdI2c<I2cDevice<'static, NoopRawMutex, I2c<'static, I2C0, Async>>>,
+    mut bmi: Bmi160<'static, I2cDevice<'static, NoopRawMutex, I2c<'static, I2C0, Async>>>
+) {
+    let mut delay = Delay;
+    let mut imu_ready = false;
+    
+    if lcd.init(&mut delay).await.is_ok() {
+        let _ = lcd.set_backlight(true);
+        let _ = lcd.clear(&mut delay).await;
+        let _ = lcd.write_str("THE RUST EAGLE", &mut delay).await;
+        Timer::after_secs(1).await;
+    }
+
+    match with_timeout(Duration::from_millis(800), bmi.init()).await {
+        Ok(Ok(_)) => imu_ready = true,
+        _ => {
+            bmi.set_address(0x69);
+            if let Ok(Ok(_)) = with_timeout(Duration::from_millis(800), bmi.init()).await {
+                imu_ready = true;
+            }
+        }
+    }
+
+    loop {
+        if imu_ready {
+            if let Ok(g) = bmi.read_gyro().await {
+                GYRO_SIGNAL.signal(g);
+                let _ = lcd.set_cursor(0, 0, &mut delay).await;
+                let mut s: String<20> = String::new();
+                let _ = write!(s, "G:{:>3},{:>3},{:>3}", g.x/128, g.y/128, g.z/128);
+                let _ = lcd.write_str(s.as_str(), &mut delay).await;
+            }
+
+            if let Ok(a) = bmi.read_accel().await {
+                ACCEL_SIGNAL.signal(a);
+                let x = a.x as f32; 
+                let y = a.y as f32; 
+                let z = a.z as f32;
+                let mag = sqrt(x*x + y*y + z*z).unwrap_or(0.0) / 16384.0;
+
+                let _ = lcd.set_cursor(1, 0, &mut delay).await;
+                let mut s: String<20> = String::new();
+                let _ = write!(s, "ACCEL: {:.2}G  ", mag);
+                let _ = lcd.write_str(s.as_str(), &mut delay).await;
+            }
+        } else {
+            let _ = lcd.set_cursor(1, 0, &mut delay).await;
+            let _ = lcd.write_str("IMU NOT FOUND", &mut delay).await;
+        }
+        Timer::after_millis(150).await;
+    }
+}
+
+````
 
 
 # ⚖️ Licence
@@ -270,3 +414,5 @@ Vous êtes libre de l’utiliser, mais toute amélioration doit être partagée 
 Parce que dans le « projet de ta vie », tu ne peux pas te permettre un driver qui freeze ou utilise du code bloquant.
 
 hd44780-i2c-nostd est conçu pour être le pont invisible, robuste et fiable entre ta logique et ton interface utilisateur.
+
+👨‍💻 Créé par Jorge Andre Castro

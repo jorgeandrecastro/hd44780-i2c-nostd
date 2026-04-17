@@ -5,7 +5,7 @@
 // (at your option) any later version.
 
 #![no_std] // We use no_std to ensure our library can be used in embedded environments.
-
+#![forbid(unsafe_code)]
 //! A robust async driver for HD44780 LCD displays via PCF8574 I2C expander.
 //! Optimized for Embassy and designed for reliability in critical embedded systems.
 
@@ -34,8 +34,8 @@ pub struct LcdI2c<I2C> {
 impl<I2C: I2c> LcdI2c<I2C> {
     /// Creates a new LCD instance.
     /// # Arguments
-    /// * `i2c` - The async I2C instance.
-    /// * `addr` - The I2C address of the PCF8574 (usually 0x27 or 0x3F).
+    /// * `i2c`  The async I2C instance.
+    /// * `addr`  The I2C address of the PCF8574 (usually 0x27 or 0x3F).
     pub fn new(i2c: I2C, addr: u8) -> Self {
         Self {
             i2c,
