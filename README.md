@@ -1,7 +1,44 @@
  # 📟 hd44780-i2c-nostd
-🦅 Version v0.3.0 testé  sur la pico 2 
+🦅 Version v0.3.1 testée sur la pico 2 et pico 2040,svp utilisez la dernière version pour plus de stabilité.
 
 Un pilote HD44780 robuste et haute performance pour Rust (no_std). Optimisé pour Embassy et les systèmes embarqués comme RP2040 (Pico), Pico 2, STM32 et ESP32.
+
+# Update Version 0.3.1, Résolution du problème d'affichage (RP2040) 
+Le projet ne fonctionnait pas initialement à cause d'une désynchronisation entre la configuration logicielle et les contraintes matérielles du RP2040. Voici les corrections apportées :
+
+1. Gestion des Opérations Atomiques (CAS)
+Le processeur Cortex-M0+ de la Pico 1 ne possède pas d'instructions atomiques natives. Pour utiliser les bibliothèques modernes (embedded-hal-bus, embassy-rp), nous avons dû forcer le compilateur à simuler ces opérations.
+
+Fichier : .cargo/config.toml
+
+Action : Ajout du flag --cfg portable_atomic_unsafe_assume_single_core dans les rustflags. Cela permet de compiler les dépendances qui exigent des garanties de synchronisation.
+
+2. Alignement des Dépendances (Cargo.toml)
+L'utilisation de versions disparates d'Embassy empêchait la bonne communication sur le bus I2C.
+
+Action : Unification des versions sur Embassy 0.6.0 et HAL 1.0.0.
+
+Impact : Cela garantit que tous les traits (I2C, Delay, etc.) sont compatibles entre le driver de l'écran et le reste du système.
+
+3. Correction de la Matrice I2C (Hardware Mapping)
+Le RP2040 a un câblage fixe pour ses périphériques I2C.
+
+Erreur : Tentative d'inversion logicielle de SDA et SCL sur les pins 8 et 9.
+
+Correction : Respect de la datasheet du RP2040 :
+
+GP8 = SDA (Data)
+
+GP9 = SCL (Clock)
+
+Code : I2c::new_async(p.I2C0, p.PIN_9, p.PIN_8, Irqs, config)
+
+4. Stabilisation du Driver (Timing)
+Les écrans LCD HD44780 sont beaucoup plus lents que le processeur de la Pico.
+
+Action : Injection de délais de 500µs entre l'activation et la désactivation du signal Enable (EN) dans le driver local.
+
+Résultat : L'écran a maintenant le temps de "lire" chaque bit envoyé avant que le suivant n'arrive.
 
 # Update la version 0.3.0 introduit le #![forbid(unsafe_code)] 
 Choix pour la safety.
@@ -9,7 +46,7 @@ Choix pour la safety.
 # 🚀 Mise à jour v0.2.4  Exemple
 Cette version est une étape majeure pour la fiabilité du driver dans l'écosystème Rust embarqué.
 
-📦 Ce qui change :
+**📦 Ce qui change :**
 Exemple "Plug & Play"  Dans la Section exemples : Ajout d'un exemple complet prêt à l'emploi. Il inclut le main.rs, la gestion du clignotement de la LED (Blink) et l'initialisation du LCD, ainsi que les dépendances pour lancer plus vite si vous avez du mal avec l'écosystème des crates .
 
 Linker Pico 2 (RP2350) : Inclusion d'une configuration de Linker optimisée pour la Raspberry Pi Pico 2. C'est une ressource précieuse pour ceux qui migrent vers cette nouvelle puce.
@@ -18,14 +55,10 @@ Linker Pico 2 (RP2350) : Inclusion d'une configuration de Linker optimisée pour
 # 🛠️ Tests et Compatibilité :
 Validé sur Pico 2 : Le driver hd44780-i2c-nostd a été testé avec succès sur le matériel RP2350.
 
-Appel aux testeurs (Pico 1/RP2040) : Bien que le driver soit conçu pour fonctionner sur tout l'écosystème Embassy, la théorie ne remplace jamais la pratique. Si vous utilisez une Pico 1, vos retours sont les bienvenus !
-
 Amélioration continue : N'hésitez pas à remonter des bugs ou à suggérer des améliorations. Ce driver évolue grâce à vos retours.
 
-⚠️ Disclaimer :
+**⚠️ Disclaimer :**
 L'électronique est capricieuse. Assurez-vous de vérifier vos tensions (5V) et vos adresses I2C (0x3F ou 0x27). Un grand merci pour votre confiance et pour les nombreux téléchargements !!!!
-
-
 
 # 🛡️ Résilience matérielle & auto-réparation (v0.2.2)
 
@@ -64,26 +97,21 @@ Changement d’API :
 Pour garantir cette fiabilité « Always-On », les méthodes publiques comme write_str, set_cursor et clear nécessitent désormais un argument de délai.
 Cela permet de respecter les timings matériels lors d’une récupération automatique.
 
-
-
-hd44780-i2c-nostd fournit un moyen fiable de piloter des écrans LCD classiques via l’expandeur I2C PCF8574.
-
-Cette crate est sous licence GPL-2.0-or-later afin de garantir que les drivers matériels fondamentaux restent un bien commun, et ne soient jamais enfermés dans des solutions propriétaires.
-
 # 🚀 Fonctionnalités principales
-Vrai asynchrone natif : construit dès le départ pour embedded-hal-async (aucune boucle bloquante, aucun gaspillage CPU)
+Asynchrone natif : construit dès le départ pour embedded-hal-async (aucune boucle bloquante, aucun gaspillage CPU)
 Efficacité zero-copy : transactions I2C optimisées avec regroupement des états High/Low pour saturer efficacement le bus
 no_std & bare-metal : parfait pour Embassy, RTIC ou des kernels personnalisés
 Initialisation anti-glitch : séquence officielle 4 bits avec délais précis pour garantir un démarrage propre
 Layouts flexibles : compatible avec écrans 16x2, 20x4 et autres formats standards
-# 📋 Changelog & mises à jour
+
+# 📋 Mise à jour
  🦅 Version 0.1.2
 Support asynchrone complet via I2c et DelayNs
 Gestion du curseur et du rétroéclairage
 Optimisation : écriture en une seule transaction pour réduire la charge I2C
 
 # 🛠️ Utilisation
-Installation
+**Dans votre Cargo.toml**
 ````
 [dependencies]
 hd44780-i2c-nostd = "0.1.2"
@@ -122,10 +150,6 @@ loop {
 ````
 # Exemple
 ````
-[package]
-name = "andrew-pico2"
-version = "0.1.0"
-edition = "2021"
 
 [dependencies]
  On garde embassy-rp 0.10.0
@@ -173,7 +197,7 @@ rustflags = [
 ]
 
 ````
-si jamais le link vous manque :cargo install flip-link
+**si jamais le link vous manque :cargo install flip-link**
 
 La flash.sh avec picotool:
 
@@ -194,7 +218,7 @@ sudo picotool load Votrenomdeprojet.uf2 -x
 
 
 
-# Et l'integration :
+**Et l'integration :**
 ````rust
 #![no_std]
 #![no_main]
@@ -400,6 +424,108 @@ async fn system_task(
     }
 }
 
+````
+# Exemple Pico 2040
+````rust
+#![no_std]
+#![no_main]
+
+use cortex_m_rt as _;
+use embassy_executor::Spawner;
+use embassy_rp::i2c::{Config as I2cConfig, I2c};
+use embassy_time::{Delay, Timer};
+use {panic_halt as _, embassy_rp as _};
+
+use hd44780_i2c_nostd::LcdI2c;
+
+use embassy_rp::bind_interrupts;
+use embassy_rp::peripherals::I2C0; 
+
+bind_interrupts!(struct Irqs {
+    I2C0_IRQ => embassy_rp::i2c::InterruptHandler<I2C0>;
+});
+
+#[embassy_executor::main]
+async fn main(_spawner: Spawner) {
+    let p = embassy_rp::init(embassy_rp::config::Config::default());
+    
+    // Attente initiale pour l'écran
+    Timer::after_millis(1000).await;
+
+    let mut i2c_config = I2cConfig::default();
+    i2c_config.frequency = 100_000; 
+    
+    // SYNCHRO FILAIRE : SCL sur PIN_8, SDA sur PIN_9
+    let i2c = I2c::new_async(p.I2C0, p.PIN_9, p.PIN_8, Irqs, i2c_config);
+    
+    let mut lcd = LcdI2c::new(i2c, 0x3F); 
+
+    // Initialisation
+    if let Err(_) = lcd.init(&mut Delay).await {
+        // En cas d'erreur, on boucle pour pouvoir débugger
+        loop { Timer::after_millis(1000).await; }
+    }
+
+    lcd.set_backlight(true);
+    let _ = lcd.clear(&mut Delay).await;
+    
+    let _ = lcd.set_cursor(0, 0, &mut Delay).await;
+    let _ = lcd.write_str("My project", &mut Delay).await;
+
+    loop {
+        let _ = lcd.set_cursor(1, 0, &mut Delay).await;
+        let _ = lcd.write_str("Status: Running ", &mut Delay).await;
+        Timer::after_millis(2000).await;
+        
+        let _ = lcd.set_cursor(1, 0, &mut Delay).await;
+        let _ = lcd.write_str("Status: OK!     ", &mut Delay).await;
+        Timer::after_millis(2000).await;
+    }
+}
+
+````
+
+**Le config.toml de l'exemple pico 2040**
+````
+[target.thumbv6m-none-eabi]
+runner = "elf2uf2-rs -d"
+rustflags = [
+  "-C", "link-arg=-Tlink.x",
+  "--cfg", "portable_atomic_unsafe_assume_single_core", # C'est ce flag qui fait tout le travail
+]
+
+[build]
+target = "thumbv6m-none-eabi"
+
+````
+
+**Et le Cargo.toml**
+````
+
+[dependencies]
+embassy-rp = { version = "0.6.0", features = ["rt", "rp2040", "time-driver", "critical-section-impl"] }
+embassy-executor = { version = "0.6.3", features = ["arch-cortex-m", "executor-thread", "task-arena-size-32768"] }
+embassy-time = { version = "0.4.0", features = ["generic-queue-8"] }
+embassy-sync = { version = "0.6.1" }
+embassy-embedded-hal = { version = "0.3.0" }
+
+embedded-hal = "1.0.0"
+embedded-hal-async = "1.0.0"
+embedded-hal-bus = { version = "0.2.0", features = ["async"] }
+portable-atomic = { version = "1.5" }
+
+cortex-m = "0.7.7"
+cortex-m-rt = "0.7.3"
+panic-halt = "0.2.0"
+
+hd44780-i2c-nostd = "0.3.0"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
 ````
 
 
