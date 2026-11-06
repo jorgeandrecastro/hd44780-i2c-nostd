@@ -1,10 +1,9 @@
 [![Crates.io](https://img.shields.io/crates/v/hd44780-i2c-nostd.svg)](https://crates.io/crates/hd44780-i2c-nostd)
 [![Documentation](https://docs.rs/hd44780-i2c-nostd/badge.svg)](https://docs.rs/hd44780-i2c-nostd)
-[![License: GPL-2.0-or-later](https://img.shields.io/badge/license-GPL--2.0--or--later-blue.svg)](https://opensource.org/licenses/GPL-2.0-or-later)
-
+[![License: MIT OR Apache-2.0](https://img.shields.io/badge/License-MIT%20or%20Apache--2.0-blue.svg)](https://opensource.org/licenses/MIT)
 
 # 📟 hd44780-i2c-nostd
-🦅 Version v0.3.2 testée sur la pico 2 et pico 2040,
+🦅 Version v0.4.0 testée sur la pico 2 et pico 2040,
 utilisez la dernière version pour plus de stabilité.
 
 Un pilote HD44780 robuste et haute performance pour Rust (no_std). Optimisé pour Embassy et les systèmes embarqués comme RP2040 (Pico), Pico 2, STM32 et ESP32.
@@ -57,7 +56,7 @@ Layouts flexibles : compatible avec écrans 16x2, 20x4 et autres formats standar
 **Dans votre Cargo.toml**
 ````
 [dependencies]
-hd44780-i2c-nostd = "0.3.2"
+hd44780-i2c-nostd = "0.4"
 ````
 
 ----
@@ -106,11 +105,18 @@ loop {
 
 ----
 
-# ⚖️ Licence
+## 🛡️ License
 
-Ce projet est sous licence GNU GPL v2.0 ou ultérieure.
+Licensed under either of:
 
-Vous êtes libre de l’utiliser, mais toute amélioration doit être partagée avec la communauté.
+    MIT license (http://opensource.org/licenses/MIT)
+
+    Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0)
+
+at your option.
+
+----
+
 
 
 👨‍💻 Créé par Jorge Andre Castro

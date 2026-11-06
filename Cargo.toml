@@ -1,12 +1,13 @@
 [package]
 name = "hd44780-i2c-nostd"
-version = "0.3.2"
-edition = "2021"
+version = "0.4.0"
+edition = "2024"
 authors = ["Jorge Andre Castro <georgeandrec@gmail.com>"]
 license = "GPL-2.0-or-later"
 description = "Minimalist async no_std driver for HD44780 via PCF8574."
 repository = "https://github.com/jorgeandrecastro/hd44780-i2c-nostd"
 readme = "README.md"
+documentation = "https://docs.rs/hd44780-i2c-nostd"
 
 [dependencies]
 embedded-hal = "1.0"
